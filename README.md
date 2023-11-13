@@ -5,7 +5,7 @@ This repository contains the implementation code for paper: <br>
 **Patching Language-Specific Homophobia/Transphobia Classifiers with a Multilingual Understanding**
 Dean Ninalga <br>
 *Proceedings of the 14th International Conference on Recent Advances in Natural Language Processing, 2023* <br>
-[[Website](https://aclanthology.org/events/ranlp-2023/)] [[Paper](https://aclanthology.org/2023.ltedi-1.28.pdf)]
+[[Paper](https://aclanthology.org/2023.ltedi-1.28.pdf)] [[Website](https://aclanthology.org/events/ranlp-2023/)] 
 
 `1st place` in three of the five languages in **Task A** in the **Second Shared Task on Homophobia and Transphobia Detection in Social Media Comments** <br>
 [[Overview Paper](https://aclanthology.org/2023.ltedi-1.6.pdf)] [[Dataset Paper](https://www.sciencedirect.com/science/article/pii/S2667096822000623)] [[Website](https://codalab.lisn.upsaclay.fr/competitions/11077#learn_the_details-overview)]
