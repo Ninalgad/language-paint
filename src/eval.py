@@ -4,7 +4,8 @@ import torch
 from sklearn.metrics import f1_score
 
 
-def predict(model, device, val_loader, return_labels=False, return_logits=False):
+def predict(model, val_loader, return_labels=False, return_logits=False):
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.eval()
 
     predictions, labels = [], []
@@ -28,11 +29,11 @@ def predict(model, device, val_loader, return_labels=False, return_logits=False)
     return predictions
 
 
-def evaluate(model, val_loader, val_lang, device):
+def evaluate(model, val_loader, val_lang):
     val_lang = np.array(val_lang)
     model.eval()
 
-    predictions, labels = predict(model, device, val_loader, return_labels=True)
+    predictions, labels = predict(model, val_loader, return_labels=True)
     scores = dict()
     for lang in sorted(set(val_lang)):
         idx = val_lang == lang

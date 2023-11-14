@@ -1,25 +1,19 @@
 from torch.optim import Adam
 from tqdm.notebook import tqdm
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import gc
 import torch
 
 from src.loss import JSD
 from src.dataloader import get_loader
 from src.eval import evaluate
+from src.model import create_model
 
 
-def get_model(model_config):
-    tokenizer = AutoTokenizer.from_pretrained(model_config['name'])
-    model = AutoModelForSequenceClassification.from_pretrained(model_config['name'], num_labels=3)
-    return model, tokenizer
-
-
-def train(model_save_name, x_train, x_dev, y_train, y_dev, df_dev_language,
-          model_config, batch_size=16, num_epochs=14,
-          model=None, tokenizer=None, optimizer=None, jsd_alpha=1., debug=False):
+def train(model_save_name, x_train, x_dev, y_train, y_dev, df_dev_language, model_config,
+          batch_size=16, num_epochs=14,
+          model=None, tokenizer=None, optimizer=None, jsd_alpha=1., return_best_model=False, debug=False):
     if model is None:
-        model, tokenizer = get_model(model_config)
+        model, tokenizer = create_model(model_config)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
 
@@ -62,7 +56,7 @@ def train(model_save_name, x_train, x_dev, y_train, y_dev, df_dev_language,
                 break
 
         gc.collect()
-        val, details = evaluate(model, val_loader, df_dev_language, device)
+        val, details = evaluate(model, val_loader, df_dev_language)
         gc.collect()
         if val > best_val:
             torch.save({
@@ -73,4 +67,7 @@ def train(model_save_name, x_train, x_dev, y_train, y_dev, df_dev_language,
             best_ep = epoch
             best_details = details
 
+    if return_best_model:
+        model.load_state_dict(torch.load(str(model_save_name) + '.pt'))
+        return best_val, best_details, model, tokenizer
     return best_val, best_details

@@ -1,7 +1,6 @@
 from loguru import logger
 from pathlib import Path
 import typer
-import torch
 import json
 
 from src.coallate import create_dataset
@@ -9,6 +8,7 @@ from src.train import train
 from src.awe import awe, finetune_languages
 from src.dataloader import get_loader
 from src.eval import evaluate
+from model import load_model_algorithm
 
 
 def main(
@@ -43,54 +43,64 @@ def main(
 
     # train
     logger.info("Training base model")
-    s, meta = train(model_dir / 'model',
-                    df_train.text.values, df_dev.text.values,
-                    df_train.category.values, df_dev.category.values,
-                    df_dev.language.values,
-                    model_config=model_config,
-                    batch_size=16, debug=debug)
+    _, _, model, tokenizer = train(
+        model_dir / 'model', df_train.text.values, df_dev.text.values, df_train.category.values, df_dev.category.values,
+        df_dev.language.values, model_config=model_config, batch_size=16, return_best_model=True, debug=debug
+    )
+    test_loader = get_loader(
+        tokenizer, model_config['input_len'], df_test.text.values, df_test.category.values,
+        batch_size=32, shuffle=False
+    )
+    _, ml_test_scores = evaluate(model, test_loader, df_test.language.values)
 
     logger.info("Finetuning languages")
-    finetune_languages(df_train, df_dev, model_dir / 'model-ft',
-                       model_dir / 'model.pt', model_config,
-                       jsd_alphas=None, num_epochs=3, debug=debug)
+    finetune_languages(
+        df_train, df_dev, model_dir / 'model-ft', model_dir / 'model.pt', model_config,
+        jsd_alphas=None, num_epochs=3, debug=debug
+    )
+    ls_test_scores = dict()
+    for lang in languages:
+        model, _, _ = load_model_algorithm(model_config, str(model_dir / f'model-ft-{lang}.pt'))
+        _, ls_scores = evaluate(model, test_loader, df_test.language.values)
+        ls_test_scores[lang] = ls_scores[lang]
 
     logger.info("Running AWE")
-    scores = {lang: [] for lang in languages}
-    baseline = {lang: [] for lang in languages}
-    alphas = dict()
+    results = {
+        'ml': {'test': ml_test_scores},
+        'ls': {'test': ls_test_scores},
+        'lp': {}
+    }
     for lang in sorted(df_dev.language.unique()):
-        awe_scores, best_alpha, awe_model, awe_tokenizer = awe(lang, model_dir / f'model-ft-{lang}.pt',
-                                                               model_dir / 'model.pt',
-                                                               df_dev.text.values, df_dev.category.values,
-                                                               df_dev.language.values, model_config=model_config,
-                                                               batch_size=32, return_best_model=True)
-        lang_ft_score, mlang_score = awe_scores[0], awe_scores[-1]
+        awe_scores, best_alpha, awe_model, tokenizer = awe(
+            lang, model_dir / f'model-ft-{lang}.pt', model_dir / 'model.pt',
+            df_dev.text.values, df_dev.category.values,
+            df_dev.language.values, model_config=model_config,
+            batch_size=32, return_best_model=True
+        )
+        ls_dev_score, ml_dev_score = awe_scores[0], awe_scores[-1]
 
-        alphas[lang] = best_alpha
-
-        # evaluate on dev_set
         df_eval = df_dev[df_dev.language == lang]
-        test_loader = get_loader(awe_tokenizer, model_config['input_len'], df_eval.text.values, df_eval.category.values,
-                                 batch_size=32,
-                                 shuffle=False)
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        s_dev, meta = evaluate(awe_model, test_loader, df_eval.language.values, device)
-
-        # evaluate on test_set
+        dev_loader = get_loader(
+            tokenizer, model_config['input_len'], df_eval.text.values, df_eval.category.values,
+            batch_size=32, shuffle=False
+        )
         df_eval = df_test[df_test.language == lang]
-        test_loader = get_loader(awe_tokenizer, model_config['input_len'], df_eval.text.values, df_eval.category.values,
-                                 batch_size=32,
-                                 shuffle=False)
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        s_test, meta = evaluate(awe_model, test_loader, df_eval.language.values, device)
+        test_loader = get_loader(
+            tokenizer, model_config['input_len'], df_eval.text.values, df_eval.category.values,
+            batch_size=32, shuffle=False
+        )
 
-        del awe_model, awe_tokenizer, df_eval
+        s_dev, _ = evaluate(awe_model, dev_loader, df_eval.language.values)
+        s_test, _ = evaluate(awe_model, test_loader, df_eval.language.values)
 
-        baseline[lang].append((lang_ft_score, mlang_score))
-        scores[lang].append((s_dev, s_test))
+        del awe_model, df_eval, dev_loader, test_loader
 
-    results = {'baseline': baseline, 'awe': scores}
+        results['ml']['dev'] = ml_dev_score
+        results['ls']['dev'] = ls_dev_score
+        results['lp']['dev'] = s_dev
+        results['lp']['test'] = s_test
+        results['lp']['alpha'] = best_alpha
+
     with open(model_dir / 'results.json', 'w') as f:
         json.dump(results, f)
     logger.success(f"Completed; saved results to {model_dir / 'results.json'}")

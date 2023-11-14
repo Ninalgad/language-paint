@@ -1,46 +1,14 @@
 import torch
 import gc
 import numpy as np
-from torch.optim import Adam
 
-from src.train import train, get_model
+from src.train import train
 from src.eval import evaluate
 from src.dataloader import get_loader
+from src.model import load_model_algorithm, create_model
 
 
-def get_mixed_model(model_config, files):
-    model, tokenizer = get_model(model_config)
-
-    weights = {name: [] for name, param in model.named_parameters()}
-
-    with torch.no_grad():
-        for f in files:
-            model.load_state_dict(torch.load(f)['model_state_dict'])
-            for name, param in model.named_parameters():
-                weights[name].append(param.data)
-
-    for name, param in model.named_parameters():
-        w = weights[name]
-        param.data = sum(w) / len(w)
-
-    return model, tokenizer
-
-
-def load_algo_model(model_config, pt_file):
-    model, tokenizer = get_model(model_config)
-    optimizer = Adam(model.parameters(), lr=1e-5)
-
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model.to(device)
-    with torch.no_grad():
-        model_obj = torch.load(pt_file)
-        model.load_state_dict(model_obj['model_state_dict'])
-        optimizer.load_state_dict(model_obj['optimizer_state_dict'])
-
-    return model, tokenizer, optimizer
-
-
-def finetune_languages(df_train, df_dev, model_save_name_base, pt_file, model_config,
+def finetune_languages(df_train, df_dev, model_save_name_base, pt_file, model_config, df_test=None,
                        jsd_alphas=None, num_epochs=3, debug=False):
     scores = {}
     languages = sorted(df_dev.language.unique())
@@ -56,7 +24,7 @@ def finetune_languages(df_train, df_dev, model_save_name_base, pt_file, model_co
         train_data, dev_data = df_train[train_index], df_dev[test_index]
         gc.collect()
 
-        model, tokenizer, optimizer = load_algo_model(model_config, pt_file)
+        model, tokenizer, optimizer = load_model_algorithm(model_config, pt_file)
         s = train(f'{model_save_name_base}-{lang}',
                   train_data.text.values, dev_data.text.values,
                   train_data.category.values, dev_data.category.values,
@@ -72,7 +40,7 @@ def finetune_languages(df_train, df_dev, model_save_name_base, pt_file, model_co
 
 def awe(lang, w0_file, w1_file, text, labels, lang_data, model_config, batch_size=32,
         return_best_model=False, debug=False):
-    model, tokenizer = get_model(model_config)
+    model, tokenizer = create_model(model_config)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
     test_loader = get_loader(tokenizer, model_config['input_len'],
@@ -90,7 +58,7 @@ def awe(lang, w0_file, w1_file, text, labels, lang_data, model_config, batch_siz
         for name, param in model.named_parameters():
             param.data = alpha * weights0[name] + beta * weights1[name]
 
-        s, meta = evaluate(model, test_loader, lang_data, device)
+        _, meta = evaluate(model, test_loader, lang_data)
         scores.append(meta[lang])
         if debug:
             break
