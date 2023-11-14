@@ -31,7 +31,8 @@ def main(
     n_rows = None
     if debug:
         logger.info("Running in debug mode")
-        n_rows = 10
+        n_rows = 2
+        input_len = 4
     logger.info(f"Creating data from {data_path}")
     df_train, df_dev, df_test = create_dataset(data_path, n_rows=n_rows)
     languages = sorted(df_dev.language.unique())
@@ -43,10 +44,11 @@ def main(
 
     # train
     logger.info("Training base model")
-    _, _, model, tokenizer = train(
+    train(
         model_dir / 'model', df_train.text.values, df_dev.text.values, df_train.category.values, df_dev.category.values,
-        df_dev.language.values, model_config=model_config, batch_size=16, return_best_model=True, debug=debug
+        df_dev.language.values, model_config=model_config, batch_size=16,  debug=debug
     )
+    model, tokenizer, _ = load_model_algorithm(model_config, str(model_dir / f'model.pt'))
     test_loader = get_loader(
         tokenizer, model_config['input_len'], df_test.text.values, df_test.category.values,
         batch_size=32, shuffle=False
@@ -65,10 +67,11 @@ def main(
         ls_test_scores[lang] = ls_scores[lang]
 
     logger.info("Running AWE")
+    empty = {l: None for l in languages}
     results = {
-        'ml': {'test': ml_test_scores},
-        'ls': {'test': ls_test_scores},
-        'lp': {}
+        'ml': {'test': ml_test_scores, 'dev': empty.copy()},
+        'ls': {'test': ls_test_scores, 'dev': empty.copy()},
+        'lp': {'test': empty.copy(), 'dev': empty.copy(), 'alpha': empty.copy()}
     }
     for lang in sorted(df_dev.language.unique()):
         awe_scores, best_alpha, awe_model, tokenizer = awe(
@@ -79,27 +82,27 @@ def main(
         )
         ls_dev_score, ml_dev_score = awe_scores[0], awe_scores[-1]
 
-        df_eval = df_dev[df_dev.language == lang]
+        df_dev_lang = df_dev[df_dev.language == lang]
         dev_loader = get_loader(
-            tokenizer, model_config['input_len'], df_eval.text.values, df_eval.category.values,
+            tokenizer, model_config['input_len'], df_dev_lang.text.values, df_dev_lang.category.values,
             batch_size=32, shuffle=False
         )
-        df_eval = df_test[df_test.language == lang]
+        df_test_lang = df_test[df_test.language == lang]
         test_loader = get_loader(
-            tokenizer, model_config['input_len'], df_eval.text.values, df_eval.category.values,
+            tokenizer, model_config['input_len'], df_test_lang.text.values, df_test_lang.category.values,
             batch_size=32, shuffle=False
         )
 
-        s_dev, _ = evaluate(awe_model, dev_loader, df_eval.language.values)
-        s_test, _ = evaluate(awe_model, test_loader, df_eval.language.values)
+        s_dev, _ = evaluate(awe_model, dev_loader, df_dev_lang.language.values)
+        s_test, _ = evaluate(awe_model, test_loader, df_test_lang.language.values)
 
-        del awe_model, df_eval, dev_loader, test_loader
+        del awe_model, df_dev_lang, df_test_lang, dev_loader, test_loader
 
-        results['ml']['dev'] = ml_dev_score
-        results['ls']['dev'] = ls_dev_score
-        results['lp']['dev'] = s_dev
-        results['lp']['test'] = s_test
-        results['lp']['alpha'] = best_alpha
+        results['ml']['dev'][lang] = ml_dev_score
+        results['ls']['dev'][lang] = ls_dev_score
+        results['lp']['dev'][lang] = s_dev
+        results['lp']['test'][lang] = s_test
+        results['lp']['alpha'][lang] = best_alpha
 
     with open(model_dir / 'results.json', 'w') as f:
         json.dump(results, f)

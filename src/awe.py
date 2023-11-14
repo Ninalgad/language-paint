@@ -8,7 +8,7 @@ from src.dataloader import get_loader
 from src.model import load_model_algorithm, create_model
 
 
-def finetune_languages(df_train, df_dev, model_save_name_base, pt_file, model_config, df_test=None,
+def finetune_languages(df_train, df_dev, model_save_name_base, pt_file, model_config,
                        jsd_alphas=None, num_epochs=3, debug=False):
     scores = {}
     languages = sorted(df_dev.language.unique())
