@@ -1,9 +1,10 @@
 # LanguagePaint
 
 This repository contains the implementation code for paper: <br>
-**Patching Language-Specific Homophobia/Transphobia Classifiers with a Multilingual Understanding**
+**Patching Language-Specific Homophobia/Transphobia Classifiers with a Multilingual Understanding** <br>
 Dean Ninalga <br>
-*Proceedings of the 14th International Conference on Recent Advances in Natural Language Processing, 2023* <br>
+_Proceedings of the Third Workshop on Language Technology for Equality, Diversity and Inclusion_ <br>
+as part of _The 14th International Conference on Recent Advances in Natural Language Processing (RANLP), 2023_ <br> <br>
 [[Paper](https://aclanthology.org/2023.ltedi-1.28.pdf)] [[Website](https://aclanthology.org/events/ranlp-2023/)] 
 
 `1st place` in three of the five languages in **Task A** in the **Second Shared Task on Homophobia and Transphobia Detection in Social Media Comments** <br>
