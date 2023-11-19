@@ -5,8 +5,6 @@ from transformers import TrainingArguments
 from transformers import Trainer
 import evaluate
 
-from src.eval import evaluate
-
 
 def compute_metrics(eval_preds):
     metric = evaluate.load("f1")

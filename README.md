@@ -67,8 +67,8 @@ For more details on installing CUDA via conda, refer to the [CUDA Installation G
 
 ## Getting Started
 ### Download the dataset
-The Homophobia/Transphobia detection shared task dataset can be accessed from the [official page] and described in [this paper](https://aclanthology.org/2023.ltedi-1.6.pdf). <br>
-Here we provide a script to automatically download and preprocess the dataset:
+The Homophobia/Transphobia detection shared task dataset is split across many drives which can be accessed from the [official page](https://codalab.lisn.upsaclay.fr/competitions/11077#participate) as described in [this paper](https://aclanthology.org/2023.ltedi-1.6.pdf). <br>
+Here, we provide a script to automatically download and preprocess the dataset:
 ```commandline
 python src/download.py
 ```
