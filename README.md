@@ -47,27 +47,52 @@ python download.py
 - PyTorch >= 2.1.0
 - Sentencepiece >= 0.1.99
 - Transformers >= 4.35.1
+transformers[torch]
+datasets
+evaluate
 ```bash
-conda create -n langP python=3.9
-conda activate langP 
-# Optional: Install CUDA via conda for a smoother installation experience,
-# but you may need to manually set the Anaconda path variables.
-# conda install cuda -c nvidia/label/cuda-11.8.0
-pip install torch==2.1.0
-pip install transformers==4.35.1
-pip install sentencepiece==0.1.99
-pip install -e .
+cd language-paint
+pip install -q -r requirements.txt
 ```
 For more details on installing CUDA via conda, refer to the [CUDA Installation Guide by NVIDIA](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#conda-installation).
 
-### Run Experiment
-Make sure to set the `src` as the working directory. The following trains on the full training dataset then, finetunes a different model on each language then performs the linear interpolation.
-Each newly trained model is saved in the `models` folder by default.
-The results of the models on the `dev` and `test` sets are saved as a json object in the same folder the models are saved. 
-<br>
-Example: 
-```bash
-python main.py --model-name "jhu-clsp/bernice"
+## Code Overview
+#### Main Files
+- [`train_mul.py`](train_mul.py): train model using all the training data
+- [`train_las.py`](train_las.py): finetune model using language specific data
+- [`run_awe.py`](gen_pseudolabels.py): run automatic weight space ensembling
+
+#### Main Arguments
+- `--model_name`: name of backbone huggingface model (e.g. 'bert-base-uncased', 'roberta-base', etc.)
+
+## Getting Started
+### Download the dataset
+The Homophobia/Transphobia detection shared task dataset can be accessed from the [official page] and described in [this paper](https://aclanthology.org/2023.ltedi-1.6.pdf). <br>
+Here we provide a script to automatically download and preprocess the dataset:
+```commandline
+python src/download.py
+```
+### Finetuning
+Train [Bernice](https://aclanthology.org/2022.emnlp-main.415/) on the entire training split of the shared task dataset
+```commandline
+python src/train_mul.py --model-name "jhu-clsp/bernice"
+```
+Train a new unique model on each language
+```commandline
+python src/train_las.py --model-name "jhu-clsp/bernice" --trained-mul-model None
+```
+### Automatic Weight Space Ensembling
+First train a multilingual model
+```commandline
+python src/train_mul.py 
+```
+Train a new unique model on each language, initialized with the weights of the multilingual model
+```commandline
+python src/train_las.py 
+```
+Run awe to perform weight interpolation between the multilingual and the language-specific models
+```commandline
+python src/run_awe.py
 ```
 # Acknowledgements
 - This code is partly based on the open-source implementations from the following sources: [imbalanced-semi-self](https://github.com/YyzHarry/imbalanced-semi-self), [S-LoRA](https://github.com/S-LoRA/S-LoRA/blob/main/README.md)

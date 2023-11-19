@@ -1,42 +1,31 @@
-import numpy as np
-import torch
-
+import pandas as pd
+from transformers import TextClassificationPipeline
 from sklearn.metrics import f1_score
 
+from utils import LABEL2ID
 
-def predict(model, val_loader, return_labels=False, return_logits=False):
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+def predict(text, model, tokenizer, input_length=128, batch_size=32):
+    model.to('cpu')
     model.eval()
 
-    predictions, labels = [], []
-    y = None
-    for batch in val_loader:
-        batch = {k: v.to(device) for k, v in batch.items()}
-        if 'labels' in batch:
-            y = batch['labels'].detach().cpu().numpy()
-            del batch['labels']
-        with torch.no_grad():
-            logits = model(**batch).logits
-        p = logits.detach().cpu().numpy()
-        if not return_logits:
-            p = np.argmax(p, axis=-1)
-        predictions.append(p)
-        labels.append(y)
+    classifier = TextClassificationPipeline(model=model, tokenizer=tokenizer, framework='pt', device=None)
 
-    predictions, labels = np.concatenate(predictions), np.concatenate(labels)
-    if return_labels:
-        return predictions, labels
+    predictions = []
+    for out in classifier(text, batch_size=batch_size, max_length=input_length):
+        predictions.append(out)
+
+    predictions = pd.DataFrame(predictions)['label'].map(lambda x: LABEL2ID[x])
     return predictions
 
 
-def evaluate(model, val_loader, val_lang):
-    val_lang = np.array(val_lang)
-    model.eval()
+def evaluate(model, tokenizer, df, input_length=128, batch_size=32):
+    predictions = predict(df['text'].tolist(), model, tokenizer, input_length, batch_size)
+    df = df.reset_index(drop=True)
 
-    predictions, labels = predict(model, val_loader, return_labels=True)
-    scores = dict()
-    for lang in sorted(set(val_lang)):
-        idx = val_lang == lang
-        s = f1_score(predictions[idx], labels[idx], average='weighted')
+    scores = {'overall': f1_score(df.category, predictions, average='weighted')}
+    for lang, g in df.groupby('language'):
+        s = f1_score(g.category, predictions.loc[g.index], average='weighted')
         scores[lang] = s
-    return np.mean(list(scores.values())), scores
+
+    return scores

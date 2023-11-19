@@ -31,4 +31,4 @@ def download_task_a(dir_, lang="", split=""):
 
 
 if __name__ == "__main__":
-    download_task_a('../data')
+    download_task_a('./data')

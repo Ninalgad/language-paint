@@ -2,7 +2,8 @@ import pandas as pd
 
 LABEL2ID = {'Non-anti-LGBT+ content': 0, 'Transphobia': 1, 'Homophobia': 2,
             'Homophobic': 2, 'Transphobic': 1, 'None': 0}
-IS2LABEL = {i: l for l, i in LABEL2ID.items()}
+
+ID2LABEL = {i: label for label, i in LABEL2ID.items()}
 
 
 def parse_file_name(f):
